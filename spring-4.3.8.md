@@ -1,8 +1,27 @@
-# 关于本翻译
+# Spring 4.3.8 中文参考手册
+
+## 作者
+
+Rod Johnson , Juergen Hoeller , Keith Donald , Colin Sampaleanu , Rob Harrop , Thomas Risberg ,
+Alef Arendsen , Darren Davison , Dmitriy Kopylenko , Mark Pollack , Thierry Templier ,
+Erwin Vervaet , Portia Tung , Ben Hale , Adrian Colyer , John Lewis , Costin Leau ,
+Mark Fisher , Sam Brannen , Ramnivas Laddad , Arjen Poutsma , Chris Beams ,
+Tareq Abedrabbo , Andy Clement , Dave Syer , Oliver Gierke , Rossen Stoyanchev ,
+Phillip Webb , Rob Winch , Brian Clozel , Stephane Nicoll , Sebastien Deleuze
+## 译者：gangzi828
+
+4.3.8.RELEASE
+Copyright © 2004-2016
+## 关于本翻译
 
 Spring 框架是本人工作至今为止一直使用的框架，该框架确实强大，一直想深入研究一下，因此，利用业余时间翻译了Spring的官方文档。个人认为，想学习一个开源框架的最佳参考资料就是起官方参考文档。由于水平有限，翻译不正确的地方请多指正。如果您觉得还不错，对您有所帮助，不妨打赏哥们一杯咖啡的小费。
-
+![](me.png)
 ---
+
+# 第一部分 Spring框架概述
+## 1.Spring框架入门
+## 2.Spring框架简介
+	
 # 第一部分 Spring框架概述
 
 spring框架为构建企业级应用程序提供了轻量级的解决方案和一站式的开发平台。然而，Spring是模块化的，它允许开发者按需使用所需模块，而无需引入不必要的模块。你可以使用IoC容器,顶层使用其他web框架,但你依然可以仅使用 Hibernate integration code或者 JDBC abstraction layer. Spring框架支持声明式事务管理,也支持通过RMI或者web Service远程访问你的逻辑代码,并且对数据持久化方案也提供了多种选择.Spring提供一个全功能的 MVC framework, 且使你能透明的将 AOP 整合进你的应用程序.
@@ -891,6 +910,220 @@ org.springframework.beans和org.springframework.context两个包是Spring IoC容
 简而言之，BeanFactory提供了配置框架和基础功能，ApplicationContext在此基础上添加了更多的企业级特定功能。ApplicationContext是BeanFactory的完整超集，本章只用于描述Spring的IoC容器。更多使用BeanFactory而非ApplicationContext的信息请参考7.16 BeanFactory“。
 在Spring中，形成应用主干且被Spring IoC容器管理的对象称为beans。一个bean就是被Spring IoC容器实例化、装配和管理的对象。简单来说，一个bean就是你的应用中众多对象中一个。Beans及其依赖是容器通过配置的元数据，依靠反射机制来实例化的。
 
+## 9.数据检验、数据绑定、类型转换
+
+### 9.1 简介
+
+```
+ JSR-303 / JSR-349 Bean验证
+
+Spring Framework 4.0支持Bean Validation 1.0（JSR-303）和Bean Validation 1.1（JSR-349），还兼容Spring的Validator接口。
+应用程序可以选择一次全局启用Bean Validation，如第9.8节“Spring Validation”中所述，并将其用于所有验证需求。
+如第9.8.3节“配置DataBinder”中所述，应用程序还可以为每个DataBinder实例注册其他的Spring Validator实例。 这可能有助于插入验证逻辑。
+
+```
+
+将数据验证归为业务逻辑有利有弊，而Spring提供了一种验证（和数据绑定）的设计，这种设计也是有利有弊。具体的验证不应该与Web层相耦合，应该易于本地化，并且应该可以插入任何可用的验证器。考虑到上述情况，Spring已经提出了一个Validator接口，它是通用的接口，在应用程序的每个层都可以使用。
+
+数据绑定对于用户输入动态绑定到应用程序的域模型（或用于处理用户输入的任何对象）是很有用的。 Spring提供了所谓的DataBinder来做到这一点。Validator和DataBinder构成验证包，主要用于但不限于MVC框架。
+
+BeanWrapper是Spring框架中的一个基本概念，在Spring框架的很多地方都用到了BeanWrapper。但是，您可能不需要直接使用BeanWrapper。因为这是参考文献，所以需要按照顺序去解释一些概念。我们将在本章中解释BeanWrapper，因为如果要使用它，那么在尝试将数据绑定到对象时，您很可能会这样做。
+
+Spring的DataBinder和较低级别的BeanWrapper都使用PropertyEditors来解析和格式化属性值。 PropertyEditor概念是JavaBeans规范的一部分，并在本章中进行了说明。 Spring 3引入了一个“core.convert”软件包，它提供了一般的类型转换工具，以及用于格式化UI字段值的更高级别的“格式”软件包。这些新软件包可能被用作PropertyEditor的更简单的替代方法，本章还将讨论这些新的软件包。
+
+### 9.2 应用Spring’s Validator接口进行数据验证
+Spring的Validator接口可用于数据对象的验证。 Validator接口使用Errors对象进行工作，以便在验证时，验证器可以向Errors对象报告验证失败。
+
+我们来考虑一个小数据对象：
+
+```
+public class Person {
+
+    private String name;
+    private int age;
+
+    // the usual getters and setters...
+}
+```
+
+我们将通过实现org.springframework.validation.Validator接口的以下两种方法为Person类提供验证行为：
+
+* supports(Class) - 这个Validator可以验证提供的Class的实例吗？
+* validate(Object, org.springframework.validation.Errors) - 验证给定对象，并在验证错误的情况下，注册给定错误对象。
+
+实现Validator接口是非常简单的，特别地，Spring Framework还提供了ValidationUtils工具类。
+
+```
+public class PersonValidator implements Validator {
+
+    /**
+     * This Validator validates *just* Person instances
+     */
+    public boolean supports(Class clazz) {
+        return Person.class.equals(clazz);
+    }
+
+    public void validate(Object obj, Errors e) {
+        ValidationUtils.rejectIfEmpty(e, "name", "name.empty");
+        Person p = (Person) obj;
+        if (p.getAge() < 0) {
+            e.rejectValue("age", "negativevalue");
+        } else if (p.getAge() > 110) {
+            e.rejectValue("age", "too.darn.old");
+        }
+    }
+}
+```
+
+如您所见，ValidationUtils类上的静态方法rejectIfEmpty（..）用于拒绝'name'属性（如果为空）或空字符串。查看ValidationUtils javadocs，了解它提供的其他功能。
+
+虽然确实有可能实现一个验证器类来验证复合对象中的每个嵌套对象，但是在其自己的Validator实现中可能更好地将每个嵌套类对象的验证逻辑封装起来。 “rich”对象的简单示例将是由两个String属性（第一个和第二个名称）和一个复杂的Address对象组成的Customer。Address对象可以独立于Customer对象使用，因此已经实现了不同的AddressValidator。如果您希望您的CustomerValidator重用Address Validator类中包含的逻辑，而无需使用复制和粘贴，您可以依赖注入或实例化CustomerValidator中的AddressValidator，并使用如下所示：
+
+```
+public class CustomerValidator implements Validator {
+
+    private final Validator addressValidator;
+
+    public CustomerValidator(Validator addressValidator) {
+        if (addressValidator == null) {
+            throw new IllegalArgumentException("The supplied [Validator] is " +
+                "required and must not be null.");
+        }
+        if (!addressValidator.supports(Address.class)) {
+            throw new IllegalArgumentException("The supplied [Validator] must " +
+                "support the validation of [Address] instances.");
+        }
+        this.addressValidator = addressValidator;
+    }
+
+    /**
+     * This Validator validates Customer instances, and any subclasses of Customer too
+     */
+    public boolean supports(Class clazz) {
+        return Customer.class.isAssignableFrom(clazz);
+    }
+
+    public void validate(Object target, Errors errors) {
+        ValidationUtils.rejectIfEmptyOrWhitespace(errors, "firstName", "field.required");
+        ValidationUtils.rejectIfEmptyOrWhitespace(errors, "surname", "field.required");
+        Customer customer = (Customer) target;
+        try {
+            errors.pushNestedPath("address");
+            ValidationUtils.invokeValidator(this.addressValidator, customer.getAddress(), errors);
+        } finally {
+            errors.popNestedPath();
+        }
+    }
+}
+```
+
+验证错误信息传递给验证器的错误对象。 在Spring Web MVC的情况下，您可以使用<spring：bind />标签检查错误消息，但是当然也可以自己检查错误对象。 有关其提供的方法的更多信息可以在javadoc中找到。
+### 9.3 解析错误消息的代码
+
+我们已经讨论了数据绑定和数据验证。最后，我们讨论一下验证错误信息的输出。在上面的例子中，我们拒绝了name和age字段。如果我们要使用MessageSource输出错误消息，我们将使用在拒绝时填充的字段（在这种情况下为'name'和'age'）给出的错误代码。当您调用（直接或间接使用ValidationUtils类）rejectValue或Errors界面中的其他拒绝方法之一时，底层实现不仅会注册您传入的代码，还可以注册一些附加错误代码。它所注册的错误代码由所使用的MessageCodesResolver决定。默认情况下，使用DefaultMessageCodesResolver，例如，不仅注册了您提供的代码的消息，还包括传递给拒绝方法的消息。因此，如果您拒绝使用rejectValue（“age”，“too.darn.old”）的字段，除了too.darn.old代码之外，Spring还将注册too.darn.old.age和too.darn.old .age.int（所以第一个将包括字段名称，第二个将包括该字段的类型）;这样做是为了方便开发人员定位错误消息等。
+
+有关MessageCodesResolver和默认策略的更多信息可分别在MessageCodesResolver和DefaultMessageCodesResolver的javadoc中在线查找。
+
+### 9.4 Bean操作和BeanWrapper
+
+org.springframework.beans包遵循Oracle提供的JavaBeans规范。 JavaBean只是一个默认无参数构造函数的类，它遵循一个命名约定（通过一个例子）一个名为bingoMadness的属性将有一个setter方法setBingoMadness（..）和一个getter方法getBingoMadness（）。有关JavaBeans规范的更多信息，请参考Oracle网站（javabeans）。
+
+Bean包中的一个非常重要的类是BeanWrapper接口及其相应的实现（BeanWrapperImpl）。引用javadocs的原话，BeanWrapper提供了设置和获取属性值（单独或批量），获取属性描述符和查询属性以确定它们是可读写还是可写的功能。此外，BeanWrapper还提供对嵌套属性的支持，可以将子属性的属性设置为无限深度。然后，BeanWrapper支持添加标准JavaBeans PropertyChangeListeners和VetoableChangeListeners的能力，而不需要在目标类中添加支持代码。最后，BeanWrapper提供了对索引属性设置的支持。 BeanWrapper通常不直接在应用程序代码中使用，而是由DataBinder和BeanFactory使用。
+
+BeanWrapper的工作方式部分由其名称表示：它包装一个bean以对该bean执行操作，例如设置和检索属性。
+#### 9.4.1 设置和获取基本属性以及嵌套属性的值
+使用setPropertyValue和getPropertyValue（s）方法来设置和获取属性，这两个方法都带有几个重载变体。 它们都在Spring附带的javadocs中有更详细的描述。 重要的是要指出一些对象指示属性的约定。 几个例子：
+
+表9.1 属性示例
+
+
+表达式 | 解释
+------|-----
+name|表示与方法getName()或isName()和setName(..)对应的属性名称
+account.name| 表示对应的account属性的嵌套name属性。 方法getAccount().setName()或getAccount().getName()
+account[2] | 表示索引account属性的第三个元素。 索引属性可以是数组，列表或其他自然排序集合
+account[COMPANYNAME]|表示Map类型的account属性的key为COMPANYNAME索引的Map条目的值
+
+下面是一些使用BeanWrapper来获取和设置属性的例子。
+
+（如果您不打算直接使用BeanWrapper，下一节对您来说并不重要，如果您只是使用DataBinder和BeanFactory及其开箱即用的实现，您应该跳过关于PropertyEditors的部分）
+
+考虑以下两个类：
+
+```
+public class Company {
+
+    private String name;
+    private Employee managingDirector;
+
+    public String getName() {
+        return this.name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Employee getManagingDirector() {
+        return this.managingDirector;
+    }
+
+    public void setManagingDirector(Employee managingDirector) {
+        this.managingDirector = managingDirector;
+    }
+}
+
+```
+
+```
+public class Employee {
+
+    private String name;
+
+    private float salary;
+
+    public String getName() {
+        return this.name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public float getSalary() {
+        return salary;
+    }
+
+    public void setSalary(float salary) {
+        this.salary = salary;
+    }
+}
+```
+
+以下代码片段显示了如何检索和操作实例化公司和员工的某些属性的示例：
+
+```
+BeanWrapper company = new BeanWrapperImpl(new Company());
+// setting the company name..
+company.setPropertyValue("name", "Some Company Inc.");
+// ... can also be done like this:
+PropertyValue value = new PropertyValue("name", "Some Company Inc.");
+company.setPropertyValue(value);
+
+// ok, let's create the director and tie it to the company:
+BeanWrapper jim = new BeanWrapperImpl(new Employee());
+jim.setPropertyValue("name", "Jim Stravinsky");
+company.setPropertyValue("managingDirector", jim.getWrappedInstance());
+
+// retrieving the salary of the managingDirector through the company
+Float salary = (Float) company.getPropertyValue("managingDirector.salary");
+```
+
+#### 9.4.2 Spring内置PropertyEditor实现
+
+
+
+
 # 第四部分 Spring 框架之测试模块
 
 Spring团队极力倡导采用测试驱动开发（TDD）软件开发方法，因此Spring涵盖了对集成测试的支持（以及单元测试的最佳实践）。 Spring团队发现，正确使用IoC使得单元和集成测试变得更容易（因为setter方法的存在和类上的适当的构造函数使得它们在测试中更容易连接在一起，而无需设置服务定位器注册表 等等）...本章主要介绍spring的测试相关内容，希望对你有帮助。
@@ -902,5 +1135,163 @@ Spring团队极力倡导采用测试驱动开发（TDD）软件开发方法，�
 测试是企业软件开发的一个重要组成部分。 本章重点介绍IoC原理对单元测试的增值，以及Spring框架对集成测试支持的好处。 （在企业开发中涉及到的测试超出本参考手册的范围。）
 # 第五部分 Spring 框架之数据访问模块
 # 第六部分 Spring 框架之Web模块
+本参考文档的这一部分涵盖了Spring框架对表示层（特别是基于Web的表示层）的支持，包括对Web应用程序中WebSocket风格的消息传递的支持。
+前两章介绍了Spring框架自己的Web框架Spring Web MVC。 后面的章节将关注Spring框架与其他Web技术（如JSF）的集成。
+
+接下来是Spring框架的MVC portlet框架。
+
+该部分的最后，也就是第26章，将全面介绍Spring框架对Websocket的支持（包括第26.4节，“基于Websocket的STOMP协议”）。
+
+* 第22章，Web MVC框架
+* 第23章，查看技术
+* 第24章，与其他Web框架集成
+* 第25章，Portlet MVC框架
+* 第26章，WebSocket支持
+## 22. Web MVC框架
+### 22.1 Spring Web MVC框架简介
+Spring的MVC（模型-视图-控制器）框架设计围绕着DispatcherServlet类来展开，DispatcherServlet能够分发请求到处理器控制器，负责配置处理器映射器、视图解析器、本地化解析器、时区解析器、主题解析器，同时还支持文件上传。默认的处理器控制器是基于@Controller和@RequestMapping注解实现的，在控制器中提供了广泛而灵活的处理方法。在Spring3.0的介绍中，我们知道通过@PathVariable注解和其他特性，@Controller机制也允许你创造RESTful风格的网站和应用。
+
+
+> “对扩展开放......”是Spring Web MVC的一个关键设计准则，Spring框架设计普遍遵循的准则是“对扩展开放，对修改关闭”。
+
+> Spring Web MVC中的很多核心类的一些方法被标识为final。这意味着，作为一个开发者，你不能重写这些方法来提供自己的行为。没有必要在任何时候都遵循这个准则，但需要明确的将这个准则记在脑子里。
+
+> 关于这个准则的明确解释，可以参考由Seth Ladd写这本书《Expert Spring Web MVC and Web Flow》；特别是看下这一章“A Look At Design,”在第一版的117页。也可以看下面这个pdf：
+[Bob Martin, The Open-Closed Principle (PDF)](https://www2.cs.duke.edu/courses/fall07/cps108/papers/ocp.pdf)
+
+> 你不能对Spring MVC中的final方法进行修改。例如：你不能对AbstractController.setSynchronizeOnSession()这个方法进行修改。想了解更多关于AOP proxies的信息请参考这一章“Understanding AOP proxies（理解AOP代理）”，它也解释了你为什么不能对final方法修改。
+
+在Spring Web MVC中你可以用任何对象当做一个命令对象或表单对象；而这个对象不用去实现或继承任何一个框架特定的接口或基础类。Spring的数据绑定十分的灵活：例如，它把数据类型不匹配当做验证错误来进行处理，而不是当做系统错误。这就意味着你不用将表单对象的属性当做简单的String类型，再转为合适的类型。它能直接绑定到它所对应的真正的对象上。
+
+Spring的视图解析器也十分灵活。一个控制器通常负责准备一个ModelMap，里面填充数据，并且返回一个逻辑视图名称，控制器也可以直接将响应内容输出到响应流来完成请求。视图解析器可以通过下面的方法灵活配置：文件扩展或者Accept header Content-Type negotiation，通过bean的名字，属性文件，甚至用户自定义的ViewResolver实现。模型（the M in MVC）是一个Map接口，它是对视图技术的完全的抽象。你可以直接和渲染技术的模板整合起来，如JSP，Velocity还有Freemarker。或者直接生成XML，JSON，Atom还有其他类型的内容。模型Map简单的转换为一个合适的格式，如JSP请求属性，a Velocity template 模型。
+#### 22.1.1 Spring Web MVC特征
+> ##### Spring Web Flow
+
+> Spring Web Flow（SWF）的目标是成为管理Web应用页面流的最佳方案。 
+> 无论是在Servlet环境还是在Portlet环境中，SWF和现有的框架都进行了整合，如Spring MVC和JSF。如果你有一个业务流程需要会话模型，而不是单纯的请求模型，那么SWF可能是一个绝佳的解决方案。
+ 
+> SWF允许你捕获逻辑页面流（logical page flow）作为自包含的模块，这些模块就可以在不同的情况下重用了，这样就可以指导用户通过控制导航来驱动业务流程以此来创建理想的web应用了。
+ 
+> 想了解更多的关于SWF的信息，请查阅 Spring Web Flow website
+
+Spring的web模块包含很多唯一的web支持特性：
+
+* 清晰的角色分离。每个角色——控制器，验证器，命令对象，表单对象，模型对象，DispatcherServlet，处理器映射器，视图解析器等，都由指定的对象来完成。
+* 强大而直接的配置方式。将框架类和应用程序类都能作为JavaBean配置，支持跨多个context的引用，例如，在web控制器中对业务对象和验证器（validator）的引用。
+* 可适配、非侵入和灵活性。 可以根据需要灵活定义控制器方法签名，并结合使用某个参数注释（例如@RequestParam，@RequestHeader，@PathVariable等）来实现特定的功能。
+* 可重用的业务代码。可以使用现有的业务对象作为命令或表单对象，而不需要去扩展框架的某个特定基类。
+* 可定制化的数据绑定机制（binding） 和数据验证机制（validation）。比如将类型不匹配错误视为应用程序级的验证错误，从而可以保存错误的信息。再比如本地化的日期和数字绑定等等。在其他某些框架中，你只能使用字符串表单对象，需要手动解析它并转换到业务对象。
+* 用户自定义控制器映射和视图解析器。处理器映射器和视图解析策略从简单的基于URL的配置到复杂的专门的解决策略。Spring比web MVC框架更灵活，web MVC框架依赖于特定的技术来实现。
+* 可定制的语言环境，时区和主题，支持带有或不带有Spring标签库的JSP，支持JSTL，支持Velocity而不需要额外的桥接，等等。
+* 一个简单而强大的JSP标签库，被称为Spring标签库，提供对数据绑定和主题等功能的支持。 自定义标签允许在标记代码方面有最大的灵活性。 有关标记库描述符的信息，请参阅附录43，Spring JSP Tag Library
+* JSP表单标签库，在Spring 2.0中引入，使得在JSP页面中写表单更加容易。想要了解更多关于标签库的信息，抢看附录，第44章，[Spring-form JSP Tag Library](https://docs.spring.io/spring/docs/4.3.8.RELEASE/spring-framework-reference/htmlsingle/#spring-tld)
+* Beans的生命周期是当前HTTP请求或HTTP会话。这不是Spring MVC独有的特性，而是WebApplicationContext容器的，Spring MVC使用WebApplicationContext容器来管理这些Beans。这些bean范围在下面这些章节中介绍“[Request， Session，global session，application, and WebSocket scopes](https://docs.spring.io/spring/docs/4.3.8.RELEASE/spring-framework-reference/htmlsingle/#beans-factory-scopes-other)”
+
+
+### 22.11 Spring异常处理
+#### 22.11.1 HandlerExceptionResolver
+Spring框架通过HandlerExceptionResolver接口来处理Controller执行期间发生的异常。 HandlerExceptionResolver有点类似于你可以在web应用程序部署描述符web.xml中定义的异常映射。但是，他们提供了一个更灵活的方式来处理程序中的异常。例如，HandlerExceptionResolver提供了有关抛出异常时正在执行的Handler处理程序的相关信息。此外，以编程的方式来处理异常为您提供了更多的灵活选择，以便你在将请求转发到另一个URL（与使用特定于Servlet的异常映射相同的最终结果）之前进行适当的响应。
+
+除了实现HandlerExceptionResolver接口（该接口只有resolveException（Exception,Handler）一个方法，该方法返回一个ModelAndView）之外，还可以使用Spring 框架提供的SimpleMappingExceptionResolver或创建@ExceptionHandler注解的异常处理方法。 SimpleMappingExceptionResolver使您可以将可能引发的任何异常的类名称映射到指定视图。这在功能上等同于Servlet API的异常映射功能，但是也可以实现针对不同的Handler处理程序的更精细的异常映射。另一方面，也可以通过使用@ExceptionHandler注解的方法来处理异常。@ExceptionHandler注解的的方法可以在@Controller中定义，也可以在@ControllerAdvice类中定义，@ControllerAdvice类中定义的异常处理方法是全局的，针对所有的@Controller方法都适用。以下部分更详细地解释了这一点。
+#### 22.11.2 @ExceptionHandler
+HandlerExceptionResolver接口和SimpleMappingExceptionResolver实现允许您在转发到这些视图之前，将Exceptions和一些可选的Java逻辑声明式地映射到特定的视图。 但是，在某些情况下，特别是依赖@ResponseBody的方法时，直接设置响应的状态并将错误内容写入响应的体可能更方便。
+
+你可以用@ExceptionHandler方法来做到这一点。 在控制器中声明时，这些方法只适用于该控制器（或其任何子类）的@RequestMapping方法引发的异常。 您也可以在@ControllerAdvice类中声明一个@ExceptionHandler方法，在这种情况下，它可以处理来自许多控制器的@RequestMapping方法的异常。 下面是一个controller-local @ExceptionHandler方法的例子：
+
+
+```
+@Controller
+public class SimpleController {
+
+    // @RequestMapping methods omitted ...
+
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<String> handleIOException(IOException ex) {
+        // prepare responseEntity
+        return responseEntity;
+    }
+
+}
+```
+
+@ExceptionHandler 的value可以设置为一个Exception类型的数组。 如果抛出一个与列表中的某个类型匹配的异常，那么将调用用匹配的@ExceptionHandler注解的方法。 如果未设置value，则处理方法参数表示的异常类型。
+
+就像使用@RequestMapping注解标注的标准控制器方法一样，@ExceptionHandler方法的方法参数和返回值可以是灵活的。 例如，可以在Servlet环境中访问HttpServletRequest，在Portlet环境中访问PortletRequest。 返回类型可以是一个字符串，它被解释为一个视图名称，一个ModelAndView对象，一个ResponseEntity，或者你也可以添加@ResponseBody方法返回值与消息转换器转换并写入响应流。
+
+#### 22.11.3处理Spring MVC标准异常
+在处理请求时，Spring MVC可能会引发一些异常。 SimpleMappingExceptionResolver可以根据需要轻松地将任何异常映射到默认错误视图。 但是，在与自动解析响应的客户端合作时，您需要在响应中设置特定的状态码。 根据引发的异常，状态码可能表示客户端错误（4xx）或服务器错误（5xx）。
+
+DefaultHandlerExceptionResolver将Spring MVC异常转换为特定的错误状态代码。 默认情况下，MVC命名空间，MVC Java配置以及DispatcherServlet（即不使用MVC命名空间或Java配置时）都注册了DefaultHandlerExceptionResolver。 下面列出的是这个解析器处理的一些异常和相应的状态码：
+
+
+Exception|	HTTP Status Code
+---------|--------------------
+BindException| 400 (Bad Request)
+ConversionNotSupportedException| 500 (Internal Server Error)
+HttpMediaTypeNotAcceptableException| 406 (Not Acceptable)
+HttpMediaTypeNotSupportedException| 415 (Unsupported Media Type)
+HttpMessageNotReadableException| 400 (Bad Request)
+HttpMessageNotWritableException| 500 (Internal Server Error)
+HttpRequestMethodNotSupportedException| 405 (Method Not Allowed)
+MethodArgumentNotValidException| 400 (Bad Request)
+MissingPathVariableException| 500 (Internal Server Error)
+MissingServletRequestParameterException| 400 (Bad Request)
+MissingServletRequestPartException| 400 (Bad Request)
+NoHandlerFoundException| 404 (Not Found)
+NoSuchRequestHandlingMethodException| 404 (Not Found)
+TypeMismatchException| 400 (Bad Request)
+
+
+
+DefaultHandlerExceptionResolver通过设置响应的状态码来透明地处理异常。 但是，当应用程序可能需要为每个错误响应添加对开发人员友好的内容（例如，提供REST API时）时，它不会将任何错误内容写入响应主体。 您可以自定义一个ModelAndView并通过视图解析来呈现错误内容 - 即通过配置ContentNegotiatingViewResolver，MappingJackson2JsonView等来实现。 但是，您可能更喜欢使用@ExceptionHandler方法。
+
+如果通过@ExceptionHandler注解的方法来处理异常，则可以将@ControllerAdvice注解的类扩展ResponseEntityExceptionHandler，这为处理Spring MVC标准的异常并返回ResponseEntity提供了便利。 您也可以自定义响应内容并使用消息转换器编写错误内容。 有关更多详细信息，请参阅ResponseEntityExceptionHandler的文档。
+
+#### 22.11.4  用@ResponseStatus注解自定义异常
+自定义的业务逻辑异常可以使用@ResponseStatus注解。 当引发异常时，ResponseStatusExceptionResolver通过相应地设置响应的状态来处理它。 默认情况下，DispatcherServlet注册ResponseStatusExceptionResolver，并可供使用。
+#### 22.11.5 自定义默认Servlet容器错误页面
+当响应的状态设置为错误状态码并且响应的主体为空时，Servlet容器通常会呈现HTML格式的错误页面。 要定制容器的默认错误页面，可以在web.xml中声明一个<error-page>元素。 直到Servlet 3，该元素必须映射到特定的状态码或异常类型。 从Servlet 3开始，不需要映射错误页面，这实际上意味着指定的位置定制了默认的Servlet容器错误页面。
+
+
+```
+<error-page>
+    <location>/error</location>
+</error-page>
+```
+
+请注意，错误页面的实际位置可以是JSP页面或容器中的其他URL，包括通过@Controller方法处理的URL：
+
+在编写错误信息时，可以通过控制器中的请求属性访问HttpServletResponse上设置的状态码和错误消息：
+
+
+```
+@Controller
+public class ErrorController {
+
+    @RequestMapping(path = "/error", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResponseBody
+    public Map<String, Object> handle(HttpServletRequest request) {
+
+        Map<String, Object> map = new HashMap<String, Object>();
+        map.put("status", request.getAttribute("javax.servlet.error.status_code"));
+        map.put("reason", request.getAttribute("javax.servlet.error.message"));
+
+        return map;
+    }
+
+}
+
+```
+在JSP中如下：
+
+
+```
+<%@ page contentType="application/json" pageEncoding="UTF-8"%>
+{
+    status:<%=request.getAttribute("javax.servlet.error.status_code") %>,
+    reason:<%=request.getAttribute("javax.servlet.error.message") %>
+}
+```
+
 # 第七部分 Spring 集成
 # 第八部分 附录
