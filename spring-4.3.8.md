@@ -21,6 +21,25 @@ Spring 框架是本人工作至今为止一直使用的框架，该框架确实�
 # 第一部分 Spring框架概述
 ## 1.Spring框架入门
 ## 2.Spring框架简介
+# 第二部分 Spring 4.x的新特性
+# 第三部分 Spring 框架核心技术
+# 第四部分 Spring 框架之测试模块
+# 第五部分 Spring 框架之数据访问模块
+# 第六部分 Spring 框架之Web模块
+## 22. Web MVC框架
+### 22.1 Spring Web MVC框架简介
+#### 22.1.1 Spring Web MVC特征
+#### 22.1.2 其他可插拔的MVC实现
+## 22 DispatcherServlet
+### 22.11 Spring异常处理
+#### 22.11.1 HandlerExceptionResolver
+#### 22.11.2 @ExceptionHandler
+#### 22.11.3 处理Spring MVC标准异常
+#### 22.11.4 用@ResponseStatus注解自定义异常
+#### 22.11.5 自定义默认Servlet容器错误页面
+# 第七部分 Spring 集成
+# 第八部分 附录
+
 	
 # 第一部分 Spring框架概述
 
@@ -1188,6 +1207,40 @@ Spring的web模块包含很多唯一的web支持特性：
 * Beans的生命周期是当前HTTP请求或HTTP会话。这不是Spring MVC独有的特性，而是WebApplicationContext容器的，Spring MVC使用WebApplicationContext容器来管理这些Beans。这些bean范围在下面这些章节中介绍“[Request， Session，global session，application, and WebSocket scopes](https://docs.spring.io/spring/docs/4.3.8.RELEASE/spring-framework-reference/htmlsingle/#beans-factory-scopes-other)”
 
 
+#### 22.1.2 其他可插拔的MVC实现
+对于某些项目来说，非Spring MVC实现更可取。许多团队希望利用他们现有的技术资源，例如JSF。
+
+如果您不想使用Spring的Web MVC，但是打算利用Spring提供的其他解决方案，则可以轻松地将您所选择的Web MVC框架与Spring框架集成。你只需通过ContextLoaderListener监听器启动一个Spring根应用程序上下文，并通过任何操作对象内的ServletContext属性（或Spring的相应的辅助方法）来访问它。不涉及“插件”，所以不需要专门的集成。从Web层的角度来看，只需使用Spring作为库，并以根应用程序上下文实例作为入口点。
+
+即使没有Spring的Web MVC，你注册的bean和Spring的服务也可以信手拈来。在这种情况下，Spring不会与其他Web框架冲突。它只是简单地解决了纯Web的MVC框架所没有的许多领域，从bean配置到数据访问和事务处理。因此，即使你只是想使用JDBC或Hibernate的事务抽象，也可以使用Spring中间层和/或数据访问层来丰富您的应用程序。
+
+## 22 DispatcherServlet
+Spring的web MVC框架和许多其他的web MVC框架一样，都是以请求为驱动的，围绕着一个核心Servlet进行设计，这个核心Servlet将请求分发给对应的控制器，并提供其他功能来驱动Web应用程序的开发。 但是，Spring的DispatcherServlet功能远不止请求分发这么简单。 它与Spring IoC容器完全集成，因此可以使用Spring提供的其他所有功能。
+
+Spring Web MVC DispatcherServlet的请求处理工作流程如下图所示。 精通设计模式的读者将认识到，DispatcherServlet是“Front Controller”设计模式（这是Spring Web MVC与许多其他领先的Web框架共享的模式）的表达式。
+
+#### 图22.1 Spring Web MVC中的请求处理工作流（高级）
+![](mvc.png)
+DispatcherServlet是一个Servlet（它继承自HttpServlet基类），这个Servlet需要在您的Web应用程序中声明。 您需要使用URL映射的方式来映射希望由DispatcherServlet处理的请求。 以下是Servlet 3.0+环境中的标准Java EE Servlet配置：
+
+```
+public class MyWebApplicationInitializer implements WebApplicationInitializer {
+
+    @Override
+    public void onStartup(ServletContext container) {
+        ServletRegistration.Dynamic registration = container.addServlet("example", new DispatcherServlet());
+        registration.setLoadOnStartup(1);
+        registration.addMapping("/example/*");
+    }
+
+}
+```
+在上面的示例中，以/example开头的所有请求都将由DispatcherServlet实例来处理。
+WebApplicationInitializer是Spring MVC提供的一个接口，它确保检测到您的基于代码的配置，并自动用于初始化任何Servlet 3容器。这个名为AbstractAnnotationConfigDispatcherServletInitializer的接口的抽象基类实现使得通过简单地指定它的servlet映射和列表配置类来更容易注册DispatcherServlet，甚至是设置Spring MVC应用程序的推荐方法。有关更多详细信息，请参阅基于代码的Servlet容器初始化
+
+DispatcherServlet是一个实际的Servlet（它从HttpServlet基类继承而来），并且在Web应用程序的web.xml中声明。您需要映射您希望DispatcherServlet处理的请求，方法是在同一个web.xml文件中使用URL映射。这是标准的Java EE Servlet配置;以下示例显示了这样一个DispatcherServlet声明和映射：
+
+下面是上面基于代码示例的web.xml等价物：
 ### 22.11 Spring异常处理
 #### 22.11.1 HandlerExceptionResolver
 Spring框架通过HandlerExceptionResolver接口来处理Controller执行期间发生的异常。 HandlerExceptionResolver有点类似于你可以在web应用程序部署描述符web.xml中定义的异常映射。但是，他们提供了一个更灵活的方式来处理程序中的异常。例如，HandlerExceptionResolver提供了有关抛出异常时正在执行的Handler处理程序的相关信息。此外，以编程的方式来处理异常为您提供了更多的灵活选择，以便你在将请求转发到另一个URL（与使用特定于Servlet的异常映射相同的最终结果）之前进行适当的响应。
